@@ -98,7 +98,7 @@ case_seed() {
     local tmp mode
     tmp="$(mktemp -d)"
     run_is "seed-only writes config and exits 0" 0 \
-        run_env "SELECTOR_CONFIG_DIR=$tmp/nested/dir" "BOOT_STAGE=seed-only"
+        env SELECTOR_CONFIG_DIR="$tmp/nested/dir" BOOT_STAGE=seed-only bash "$ENTRY"
     ok  "haproxy.cfg file exists and non-empty" test -s "$tmp/nested/dir/haproxy.cfg"
     mode="$(stat -c '%a' "$tmp/nested/dir/haproxy.cfg" 2>/dev/null || echo missing)"
     eq  "haproxy.cfg mode is 644" "$mode" "644"
@@ -150,7 +150,9 @@ docker_cases() {
     echo "=== DOCKER CASES ==="
     local vol="watchdog-test-$$" cfg
     docker volume rm -f "$vol" >/dev/null 2>&1 || true
-    trap 'docker volume rm -f "$vol" >/dev/null 2>&1 || true' EXIT
+    # Double quotes on purpose: the EXIT trap fires after this function returns,
+    # so a single-quoted $vol would be unbound under `set -u`.
+    trap "docker volume rm -f '$vol' >/dev/null 2>&1 || true" EXIT
     run_is "container seed-only writes haproxy.cfg" 0 \
         docker run --rm --network none -v "$vol":/etc/haproxy-selector \
             -e BOOT_STAGE=seed-only "$IMG"
@@ -160,6 +162,7 @@ docker_cases() {
     run_is "container ships required CLI tools" 0 \
         docker run --rm --network none --entrypoint /bin/sh "$IMG" \
             -c 'docker --version && jq --version && curl --version && ss --version'
+    docker volume rm -f "$vol" >/dev/null 2>&1 || true
 }
 
 main_cases() {
