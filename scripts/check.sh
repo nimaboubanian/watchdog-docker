@@ -84,8 +84,8 @@ fi
 if [ $FAILOVER = 1 ]; then
     names=$(docker ps --filter 'name=^vpndogs-sb-client-' --format '{{.Names}}')
     [ -n "$names" ] || fail "failover: no running sb-clients to stop"
-    docker stop $names > /dev/null
     trap 'docker start $names > /dev/null 2>&1 || true' EXIT INT TERM
+    docker stop $names > /dev/null
     sleep 15
 
     # ponytail: if-condition, not a bare assignment — under `set -e` a curl error

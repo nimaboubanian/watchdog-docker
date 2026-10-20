@@ -138,7 +138,7 @@ s ""
 if snu "$ROUTER"; then
     s "router \`:$ROUTER_PORT\` established:"
     s '```'
-    s "$(docker exec "$ROUTER" ss -tn "sport = :$ROUTER_PORT" 2>/dev/null || true)"
+    s "$(docker exec "$ROUTER" sh -c "ss -tn 'sport = :$ROUTER_PORT' 2>/dev/null || netstat -tn 2>/dev/null | grep ':$ROUTER_PORT '" 2>/dev/null || true)"
     s '```'
     s ""
 fi

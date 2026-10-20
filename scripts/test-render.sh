@@ -114,10 +114,25 @@ case_scripts() {
     has "check.sh waits on watchdog" "$(cat "$HERE/check.sh" 2>/dev/null || true)" "vpndogs-watchdog"
     has "check.sh uses ROUTER_HOST"  "$(cat "$HERE/check.sh" 2>/dev/null || true)" 'ROUTER_HOST:-vpndogs-router'
     has "check.sh traps failover"    "$(cat "$HERE/check.sh" 2>/dev/null || true)" 'trap '\''docker start $names'
+    ok  "check.sh registers trap before docker stop" \
+        awk '/trap .*docker start \$names/{t=NR} /docker stop \$names/{s=NR} END{exit !(t && s && t < s)}' "$HERE/check.sh"
 
     local mockdir out_md err_log
     mockdir="$(mktemp -d)"
-    printf '#!/bin/sh\nexit 1\n' > "$mockdir/docker"
+    cat <<'EOF' > "$mockdir/docker"
+#!/bin/sh
+if [ "$1" = "inspect" ] && [ "$3" = "{{.State.Status}}" ] && [ "$4" = "vpndogs-router" ]; then
+    echo "running"
+    exit 0
+fi
+if [ "$1" = "exec" ] && [ "$2" = "vpndogs-router" ]; then
+    shift 2
+    case "$*" in
+        *netstat*) echo "tcp 0 0 127.0.0.1:1070 127.0.0.1:54321 ESTABLISHED"; exit 0 ;;
+    esac
+fi
+exit 1
+EOF
     printf '#!/bin/sh\nexit 1\n' > "$mockdir/curl"
     chmod +x "$mockdir/docker" "$mockdir/curl"
     out_md="$mockdir/stdout.md"
@@ -125,6 +140,7 @@ case_scripts() {
     PATH="$mockdir:$PATH" SELECTOR_CONFIG_DIR="$mockdir" bash "$HERE/report.sh" >"$out_md" 2>"$err_log" || true
     has   "stdout has report header"     "$(cat "$out_md")" "# vpndogs report"
     has   "stdout lists watchdog"        "$(cat "$out_md")" "vpndogs-watchdog"
+    has   "stdout shows router sockets via netstat fallback" "$(cat "$out_md")" "127.0.0.1:54321 ESTABLISHED"
     lacks "stdout has no progress lines" "$(cat "$out_md")" "→ hosts & containers"
     has   "stderr has progress lines"    "$(cat "$err_log")" "→ hosts & containers"
     rm -rf "$mockdir"
