@@ -106,10 +106,35 @@ case_seed() {
     rm -rf "$tmp"
 }
 
+case_scripts() {
+    echo "=== SCRIPT & REPORT STREAM CASES ==="
+    ok "entrypoint.sh syntax" bash -n "$HERE/entrypoint.sh"
+    ok "check.sh syntax"      bash -n "$HERE/check.sh"
+    ok "report.sh syntax"     bash -n "$HERE/report.sh"
+    has "check.sh waits on watchdog" "$(cat "$HERE/check.sh" 2>/dev/null || true)" "vpndogs-watchdog"
+    has "check.sh uses ROUTER_HOST"  "$(cat "$HERE/check.sh" 2>/dev/null || true)" 'ROUTER_HOST:-vpndogs-router'
+    has "check.sh traps failover"    "$(cat "$HERE/check.sh" 2>/dev/null || true)" 'trap '\''docker start $names'
+
+    local mockdir out_md err_log
+    mockdir="$(mktemp -d)"
+    printf '#!/bin/sh\nexit 1\n' > "$mockdir/docker"
+    printf '#!/bin/sh\nexit 1\n' > "$mockdir/curl"
+    chmod +x "$mockdir/docker" "$mockdir/curl"
+    out_md="$mockdir/stdout.md"
+    err_log="$mockdir/stderr.log"
+    PATH="$mockdir:$PATH" SELECTOR_CONFIG_DIR="$mockdir" bash "$HERE/report.sh" >"$out_md" 2>"$err_log" || true
+    has   "stdout has report header"     "$(cat "$out_md")" "# vpndogs report"
+    has   "stdout lists watchdog"        "$(cat "$out_md")" "vpndogs-watchdog"
+    lacks "stdout has no progress lines" "$(cat "$out_md")" "→ hosts & containers"
+    has   "stderr has progress lines"    "$(cat "$err_log")" "→ hosts & containers"
+    rm -rf "$mockdir"
+}
+
 main_cases() {
     case_validate
     case_render
     case_seed
+    case_scripts
 }
 
 main_cases
