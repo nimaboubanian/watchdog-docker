@@ -130,6 +130,22 @@ case_scripts() {
     rm -rf "$mockdir"
 }
 
+docker_cases() {
+    echo "=== DOCKER CASES ==="
+    local vol="watchdog-test-$$" cfg
+    docker volume rm -f "$vol" >/dev/null 2>&1 || true
+    trap 'docker volume rm -f "$vol" >/dev/null 2>&1 || true' EXIT
+    run_is "container seed-only writes haproxy.cfg" 0 \
+        docker run --rm --network none -v "$vol":/etc/haproxy-selector \
+            -e BOOT_STAGE=seed-only "$IMG"
+    cfg="$(docker run --rm --network none -v "$vol":/etc/haproxy-selector \
+        --entrypoint /bin/sh "$IMG" -c 'cat /etc/haproxy-selector/haproxy.cfg')"
+    has "container volume has backend egress" "$cfg" "backend egress"
+    run_is "container ships required CLI tools" 0 \
+        docker run --rm --network none --entrypoint /bin/sh "$IMG" \
+            -c 'docker --version && jq --version && curl --version && ss --version'
+}
+
 main_cases() {
     case_validate
     case_render
@@ -138,4 +154,7 @@ main_cases() {
 }
 
 main_cases
+if [ "$MODE" = docker ]; then
+    docker_cases
+fi
 exit "$fail"

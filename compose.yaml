@@ -1,0 +1,20 @@
+services:
+  watchdog:
+    build:
+      context: .
+      network: host
+    image: watchdog:latest
+    container_name: vpndogs-watchdog
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - selector-config:/etc/haproxy-selector
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /etc/haproxy-selector/haproxy.cfg && docker info >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  selector-config:
