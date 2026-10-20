@@ -75,19 +75,48 @@ backend egress
 EOF
 }
 
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
 cmd_render() {
     validate_env
     echo "# === selector/haproxy.cfg ==="
     render_selector_conf
 }
 
+write_selector_config() {
+    local dest="$SELECTOR_CONFIG_DIR/haproxy.cfg"
+    mkdir -p "$SELECTOR_CONFIG_DIR"
+    render_selector_conf > "$dest.tmp"
+    chmod 644 "$dest.tmp"
+    mv "$dest.tmp" "$dest"
+    log "selector config written to $dest"
+}
+
 main() {
     validate_env
+    write_selector_config
+    if [ "${BOOT_STAGE:-}" = seed-only ]; then
+        exit 0
+    fi
+    log "watchdog up"
+    trap 'log "shutting down"; exit 0' TERM INT
+    while true; do
+        sleep 3600 &
+        wait $! || true
+    done
 }
 
 case "${1:-}" in
     render)
         cmd_render
+        ;;
+    check)
+        shift
+        exec "$HERE/check.sh" "$@"
+        ;;
+    report)
+        shift
+        exec "$HERE/report.sh" "$@"
         ;;
     *)
         main

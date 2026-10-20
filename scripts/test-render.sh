@@ -93,9 +93,23 @@ case_render() {
     has "custom backup backend"    "$cfg" "server softether-fallback custom-se:2082 check backup"
 }
 
+case_seed() {
+    echo "=== SEED CASES ==="
+    local tmp mode
+    tmp="$(mktemp -d)"
+    run_is "seed-only writes config and exits 0" 0 \
+        run_env "SELECTOR_CONFIG_DIR=$tmp/nested/dir" "BOOT_STAGE=seed-only"
+    ok  "haproxy.cfg file exists and non-empty" test -s "$tmp/nested/dir/haproxy.cfg"
+    mode="$(stat -c '%a' "$tmp/nested/dir/haproxy.cfg" 2>/dev/null || echo missing)"
+    eq  "haproxy.cfg mode is 644" "$mode" "644"
+    has "seeded file has backend egress" "$(cat "$tmp/nested/dir/haproxy.cfg" 2>/dev/null || true)" "backend egress"
+    rm -rf "$tmp"
+}
+
 main_cases() {
     case_validate
     case_render
+    case_seed
 }
 
 main_cases
