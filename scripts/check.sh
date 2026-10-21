@@ -82,7 +82,14 @@ else
 fi
 
 if [ "$(docker inspect --format '{{.State.Status}}' vpndogs-tls-inbound 2>/dev/null || echo missing)" = running ]; then
-    tlsh=$(docker inspect --format '{{.State.Health.Status}}' vpndogs-tls-inbound 2>/dev/null || echo missing)
+    tls_budget=40
+    tlsh="starting"
+    while [ $tls_budget -gt 0 ] && [ "$tlsh" = "starting" ]; do
+        tlsh=$(docker inspect --format '{{.State.Health.Status}}' vpndogs-tls-inbound 2>/dev/null || echo missing)
+        [ "$tlsh" = healthy ] && break
+        sleep 2
+        tls_budget=$((tls_budget - 2))
+    done
     [ "$tlsh" = healthy ] || fail "tls-inbound: container is running but not healthy ($tlsh)"
     tls_ip=$(curl -s --retry 2 --retry-all-errors --max-time 20 $SOCKS vpndogs-tls-inbound:1065 https://api.ipify.org || true)
     if [ -n "$tls_ip" ] && [ "$tls_ip" != "$host_ip" ]; then

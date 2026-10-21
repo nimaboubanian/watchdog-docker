@@ -119,6 +119,7 @@ case_scripts() {
     has "check.sh verifies tls-inbound"          "$(cat "$HERE/check.sh" 2>/dev/null || true)" 'vpndogs-tls-inbound'
     has "check.sh verifies tls-inbound socks"    "$(cat "$HERE/check.sh" 2>/dev/null || true)" 'vpndogs-tls-inbound:1065'
     has "check.sh verifies tls-inbound fallback" "$(cat "$HERE/check.sh" 2>/dev/null || true)" '127.0.0.1:8080'
+    has "check.sh waits for tls-inbound health"  "$(cat "$HERE/check.sh" 2>/dev/null || true)" 'tls_budget='
 
     local mockdir out_md err_log
     mockdir="$(mktemp -d)"
