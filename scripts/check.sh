@@ -81,6 +81,22 @@ else
     pass "blackhole (googlesyndication.com unreachable)"
 fi
 
+if [ "$(docker inspect --format '{{.State.Status}}' vpndogs-tls-inbound 2>/dev/null || echo missing)" = running ]; then
+    tlsh=$(docker inspect --format '{{.State.Health.Status}}' vpndogs-tls-inbound 2>/dev/null || echo missing)
+    [ "$tlsh" = healthy ] || fail "tls-inbound: container is running but not healthy ($tlsh)"
+    tls_ip=$(curl -s --retry 2 --retry-all-errors --max-time 20 $SOCKS vpndogs-tls-inbound:1065 https://api.ipify.org || true)
+    if [ -n "$tls_ip" ] && [ "$tls_ip" != "$host_ip" ]; then
+        pass "tls-inbound socks :1065 egress (proxy: $tls_ip)"
+    else
+        fail "tls-inbound socks :1065 egress: IP empty or equals host IP ($tls_ip)"
+    fi
+    if docker exec vpndogs-tls-inbound curl -fsSL --max-time 5 http://127.0.0.1:8080/ 2>/dev/null | grep -q 'dir="rtl"'; then
+        pass "tls-inbound fallback static website (dir=rtl)"
+    else
+        fail "tls-inbound fallback static website unreachable on 127.0.0.1:8080"
+    fi
+fi
+
 if [ $FAILOVER = 1 ]; then
     names=$(docker ps --filter 'name=^vpndogs-sb-client-' --format '{{.Names}}')
     [ -n "$names" ] || fail "failover: no running sb-clients to stop"

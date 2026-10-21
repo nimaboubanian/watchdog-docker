@@ -116,20 +116,31 @@ case_scripts() {
     has "check.sh traps failover"    "$(cat "$HERE/check.sh" 2>/dev/null || true)" 'trap '\''docker start $names'
     ok  "check.sh registers trap before docker stop" \
         awk '/trap .*docker start \$names/{t=NR} /docker stop \$names/{s=NR} END{exit !(t && s && t < s)}' "$HERE/check.sh"
+    has "check.sh verifies tls-inbound"          "$(cat "$HERE/check.sh" 2>/dev/null || true)" 'vpndogs-tls-inbound'
+    has "check.sh verifies tls-inbound socks"    "$(cat "$HERE/check.sh" 2>/dev/null || true)" 'vpndogs-tls-inbound:1065'
+    has "check.sh verifies tls-inbound fallback" "$(cat "$HERE/check.sh" 2>/dev/null || true)" '127.0.0.1:8080'
 
     local mockdir out_md err_log
     mockdir="$(mktemp -d)"
     cat <<'EOF' > "$mockdir/docker"
 #!/bin/sh
-if [ "$1" = "inspect" ] && [ "$3" = "{{.State.Status}}" ] && [ "$4" = "vpndogs-router" ]; then
-    echo "running"
-    exit 0
-fi
-if [ "$1" = "exec" ] && [ "$2" = "vpndogs-router" ]; then
-    shift 2
-    case "$*" in
-        *netstat*) echo "tcp 0 0 127.0.0.1:1070 127.0.0.1:54321 ESTABLISHED"; exit 0 ;;
+if [ "$1" = "inspect" ] && [ "$3" = "{{.State.Status}}" ]; then
+    case "$4" in
+        vpndogs-router|vpndogs-tls-inbound) echo "running"; exit 0 ;;
     esac
+fi
+if [ "$1" = "exec" ]; then
+    if [ "$2" = "vpndogs-router" ]; then
+        shift 2
+        case "$*" in
+            *netstat*) echo "tcp 0 0 127.0.0.1:1070 127.0.0.1:54321 ESTABLISHED"; exit 0 ;;
+        esac
+    elif [ "$2" = "vpndogs-tls-inbound" ]; then
+        shift 2
+        case "$*" in
+            *report.sh*) echo "== Processes =="; echo "sing-box: UP"; echo "nginx: UP"; exit 0 ;;
+        esac
+    fi
 fi
 exit 1
 EOF
@@ -140,6 +151,9 @@ EOF
     PATH="$mockdir:$PATH" SELECTOR_CONFIG_DIR="$mockdir" bash "$HERE/report.sh" >"$out_md" 2>"$err_log" || true
     has   "stdout has report header"     "$(cat "$out_md")" "# vpndogs report"
     has   "stdout lists watchdog"        "$(cat "$out_md")" "vpndogs-watchdog"
+    has   "stdout lists tls-inbound"     "$(cat "$out_md")" "vpndogs-tls-inbound"
+    has   "stdout shows tls topology"    "$(cat "$out_md")" "tls-inbound ● TCP 80/443 + 127.0.0.1:1065"
+    has   "stdout shows tls inbounds"    "$(cat "$out_md")" "**vpndogs-tls-inbound** — TCP 80/443 + 127.0.0.1:1065"
     has   "stdout shows router sockets via netstat fallback" "$(cat "$out_md")" "127.0.0.1:54321 ESTABLISHED"
     lacks "stdout has no progress lines" "$(cat "$out_md")" "→ hosts & containers"
     has   "stderr has progress lines"    "$(cat "$err_log")" "→ hosts & containers"

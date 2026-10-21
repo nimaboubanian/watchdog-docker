@@ -22,7 +22,8 @@ IPSEC=vpndogs-ipsec-inbound
 WG=vpndogs-wg-inbound
 AWG=vpndogs-awg-inbound
 OVPN=vpndogs-ovpn-inbound
-CONTAINERS=("$WATCHDOG" "$ROUTER" "$SELECTOR" "$LB" vpndogs-sb-client-1 vpndogs-sb-client-2 vpndogs-sb-client-3 vpndogs-sb-client-4 "$SE" "$IPSEC" "$WG" "$AWG" "$OVPN")
+TLS=vpndogs-tls-inbound
+CONTAINERS=("$WATCHDOG" "$ROUTER" "$SELECTOR" "$LB" vpndogs-sb-client-1 vpndogs-sb-client-2 vpndogs-sb-client-3 vpndogs-sb-client-4 "$SE" "$IPSEC" "$WG" "$AWG" "$OVPN" "$TLS")
 
 UL_BODY=$(mktemp)
 
@@ -128,6 +129,7 @@ s "local socks/http :$ROUTER_PORT ──► router [$r]"
 [ "$(up_mark "$WG")"    = UP ] && s " wg-inbound  ● UDP 1062 → tun0 → router :$ROUTER_PORT"
 [ "$(up_mark "$AWG")"   = UP ] && s " awg-inbound ● UDP 1063 → tun0 → router :$ROUTER_PORT"
 [ "$(up_mark "$OVPN")"  = UP ] && s " ovpn-inbound ● TCP 1064 → tun0 → tun1 → router :$ROUTER_PORT"
+[ "$(up_mark "$TLS")"   = UP ] && s " tls-inbound ● TCP 80/443 + 127.0.0.1:1065 → router :$ROUTER_PORT"
 s '```'
 s ""
 step_end
@@ -170,7 +172,14 @@ if [ "$(up_mark "$OVPN")" = UP ]; then
     s '```'
     s ""
 fi
-if ! snu "$IPSEC" && ! snu "$WG" && ! snu "$AWG" && ! snu "$OVPN"; then
+if [ "$(up_mark "$TLS")" = UP ]; then
+    s "**$TLS** — TCP 80/443 + 127.0.0.1:1065:"
+    s '```'
+    s "$(docker exec "$TLS" report.sh 2>/dev/null || true)"
+    s '```'
+    s ""
+fi
+if ! snu "$IPSEC" && ! snu "$WG" && ! snu "$AWG" && ! snu "$OVPN" && ! snu "$TLS"; then
     s "_no VPN inbound nodes running (profiles off)_"
     s ""
 fi
