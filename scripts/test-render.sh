@@ -103,6 +103,15 @@ case_seed() {
     mode="$(stat -c '%a' "$tmp/nested/dir/haproxy.cfg" 2>/dev/null || echo missing)"
     eq  "haproxy.cfg mode is 644" "$mode" "644"
     has "seeded file has backend egress" "$(cat "$tmp/nested/dir/haproxy.cfg" 2>/dev/null || true)" "backend egress"
+    # the sb-cluster check is a SOCKS5 CONNECT to 1.1.1.1:443, so it
+    # completes a full tunnel handshake — through the xray clients that is a
+    # fragmented two-hop VLESS handshake (1-4.6s), which must fit inside
+    # timeout check or the primary is marked down and the stack silently
+    # falls back to softether
+    has "seeded file has a check timeout that fits the tunnel" \
+        "$(cat "$tmp/nested/dir/haproxy.cfg" 2>/dev/null || true)" "timeout check   15s"
+    has "seeded file has a connect timeout that fits the tunnel" \
+        "$(cat "$tmp/nested/dir/haproxy.cfg" 2>/dev/null || true)" "timeout connect 30s"
     rm -rf "$tmp"
 }
 
@@ -120,6 +129,11 @@ case_scripts() {
     has "check.sh verifies tls-inbound socks"    "$(cat "$HERE/check.sh" 2>/dev/null || true)" 'vpndogs-tls-inbound:1065'
     has "check.sh verifies tls-inbound fallback" "$(cat "$HERE/check.sh" 2>/dev/null || true)" '127.0.0.1:8080'
     has "check.sh waits for tls-inbound health"  "$(cat "$HERE/check.sh" 2>/dev/null || true)" 'tls_budget='
+    # the sb-client healthcheck is a real end-to-end tunnel fetch and the LB
+    # only starts once that client is healthy: the readiness budget has to
+    # cover it
+    has "check.sh budget covers the tunnel healthcheck" \
+        "$(cat "$HERE/check.sh" 2>/dev/null || true)" 'budget=180'
 
     local mockdir out_md err_log
     mockdir="$(mktemp -d)"

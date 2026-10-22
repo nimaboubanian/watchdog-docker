@@ -49,10 +49,10 @@ defaults
     option tcplog
     option redispatch
     retries 3
-    timeout connect 5s
+    timeout connect 30s
     timeout client  1h
     timeout server  1h
-    timeout check   3s
+    timeout check   15s
 
 resolvers docker
     nameserver dns 127.0.0.11:53
@@ -67,6 +67,11 @@ backend egress
     tcp-check connect
     tcp-check send-binary 050100
     tcp-check expect binary 0500
+    # the second exchange is a SOCKS5 CONNECT to 1.1.1.1:443, so the check
+    # completes a full tunnel handshake: through the xray clients that is a
+    # fragmented two-hop VLESS handshake, measured at 1-4.6s, and it must
+    # fit inside timeout check or the primary is marked down and the stack
+    # silently falls back to softether
     tcp-check send-binary 050100010101010101bb
     tcp-check expect binary 0500
     default-server inter 2s fall 3 rise 2 resolvers docker init-addr last,libc,none

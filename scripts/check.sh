@@ -20,7 +20,10 @@ pass() {
 wait_containers() {
     # wait until every watchdog/router/sb-client/selector/LB container is healthy
     # (softether only needs `running`: gost answers even if the tunnel is down)
-    local budget=120
+    # 180s, not 120s: the sb-client healthcheck is now a real end-to-end
+    # tunnel fetch (interval 30s, start_period 120s) and the LB only starts
+    # once that client is healthy, so the critical path grew.
+    local budget=180
     while [ $budget -gt 0 ]; do
         local ok=1
         for c in vpndogs-watchdog vpndogs-router vpndogs-selector vpndogs-sb-clients-lb vpndogs-sb-client-1; do
