@@ -18,15 +18,15 @@ pass() {
 }
 
 wait_containers() {
-    # wait until every watchdog/router/sb-client/selector/LB container is healthy
+    # wait until every watchdog/router/xray-client/selector/LB container is healthy
     # (softether only needs `running`: gost answers even if the tunnel is down)
-    # 180s, not 120s: the sb-client healthcheck is now a real end-to-end
+    # 180s, not 120s: the xray-client healthcheck is now a real end-to-end
     # tunnel fetch (interval 30s, start_period 120s) and the LB only starts
     # once that client is healthy, so the critical path grew.
     local budget=180
     while [ $budget -gt 0 ]; do
         local ok=1
-        for c in vpndogs-watchdog vpndogs-router vpndogs-selector vpndogs-sb-clients-lb vpndogs-sb-client-1; do
+        for c in vpndogs-watchdog vpndogs-router vpndogs-selector vpndogs-xray-clients-lb vpndogs-xray-client-1; do
             state=$(docker inspect --format '{{.State.Health.Status}}' "$c" 2>/dev/null || echo missing)
             [ "$state" = healthy ] || ok=0
         done
@@ -108,14 +108,14 @@ if [ "$(docker inspect --format '{{.State.Status}}' vpndogs-tls-inbound 2>/dev/n
 fi
 
 if [ $FAILOVER = 1 ]; then
-    names=$(docker ps --filter 'name=^vpndogs-sb-client-' --format '{{.Names}}')
-    [ -n "$names" ] || fail "failover: no running sb-clients to stop"
+    names=$(docker ps --filter 'name=^vpndogs-xray-client-' --format '{{.Names}}')
+    [ -n "$names" ] || fail "failover: no running xray-clients to stop"
     trap 'docker start $names > /dev/null 2>&1 || true' EXIT INT TERM
     docker stop $names > /dev/null
     sleep 15
 
     # ponytail: if-condition, not a bare assignment — under `set -e` a curl error
-    # would abort before `docker start`, leaving the sb-clients stopped.
+    # would abort before `docker start`, leaving the xray-clients stopped.
     if failover_ip=$(curl -s --retry 2 --retry-all-errors --max-time 20 $SOCKS "$PROXY" https://api.ipify.org) \
         && [ -n "$failover_ip" ] && [ "$failover_ip" != "$host_ip" ]; then
         pass "failover (egress: $failover_ip)"
@@ -137,7 +137,7 @@ if [ $FAILOVER = 1 ]; then
         sleep 5
         budget=$((budget - 5))
     done
-    [ "$restored" = 1 ] || fail "restore: no sb-cluster egress after clients restarted"
+    [ "$restored" = 1 ] || fail "restore: no xray-cluster egress after clients restarted"
 fi
 
 echo "all checks passed" >&2

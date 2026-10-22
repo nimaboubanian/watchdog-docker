@@ -9,7 +9,7 @@ set -euo pipefail
 
 SELECTOR_CONFIG_DIR="${SELECTOR_CONFIG_DIR-/etc/haproxy-selector}"
 SELECTOR_PORT="${SELECTOR_PORT-1080}"
-LB_HOST="${LB_HOST-vpndogs-sb-clients-lb}"
+LB_HOST="${LB_HOST-vpndogs-xray-clients-lb}"
 LB_PORT="${LB_PORT-1081}"
 SOFTETHER_HOST="${SOFTETHER_HOST-vpndogs-softether}"
 SOFTETHER_PORT="${SOFTETHER_PORT-1082}"
@@ -75,7 +75,7 @@ backend egress
     tcp-check send-binary 050100010101010101bb
     tcp-check expect binary 0500
     default-server inter 2s fall 3 rise 2 resolvers docker init-addr last,libc,none
-    server sb-cluster $LB_HOST:$LB_PORT check
+    server xray-cluster $LB_HOST:$LB_PORT check
     server softether-fallback $SOFTETHER_HOST:$SOFTETHER_PORT check backup
 EOF
 }

@@ -81,7 +81,7 @@ case_render() {
     has "docker resolver"          "$cfg" "nameserver dns 127.0.0.11:53"
     has "socks5 tcp-check"         "$cfg" "tcp-check send-binary 050100010101010101bb"
     has "init-addr deferred"       "$cfg" "default-server inter 2s fall 3 rise 2 resolvers docker init-addr last,libc,none"
-    has "primary sb-cluster"       "$cfg" "server sb-cluster vpndogs-sb-clients-lb:1081 check"
+    has "primary xray-cluster"       "$cfg" "server xray-cluster vpndogs-xray-clients-lb:1081 check"
     has "backup softether"         "$cfg" "server softether-fallback vpndogs-softether:1082 check backup"
 
     run_is "custom override render" 0 run_env \
@@ -89,7 +89,7 @@ case_render() {
         "SOFTETHER_HOST=custom-se" "SOFTETHER_PORT=2082" render
     cfg="$(block "selector/haproxy.cfg" "$LAST_OUT")"
     has "custom bind port"         "$cfg" "bind :2080"
-    has "custom primary backend"   "$cfg" "server sb-cluster custom-lb:2081 check"
+    has "custom primary backend"   "$cfg" "server xray-cluster custom-lb:2081 check"
     has "custom backup backend"    "$cfg" "server softether-fallback custom-se:2082 check backup"
 }
 
@@ -103,7 +103,7 @@ case_seed() {
     mode="$(stat -c '%a' "$tmp/nested/dir/haproxy.cfg" 2>/dev/null || echo missing)"
     eq  "haproxy.cfg mode is 644" "$mode" "644"
     has "seeded file has backend egress" "$(cat "$tmp/nested/dir/haproxy.cfg" 2>/dev/null || true)" "backend egress"
-    # the sb-cluster check is a SOCKS5 CONNECT to 1.1.1.1:443, so it
+    # the xray-cluster check is a SOCKS5 CONNECT to 1.1.1.1:443, so it
     # completes a full tunnel handshake — through the xray clients that is a
     # fragmented two-hop VLESS handshake (1-4.6s), which must fit inside
     # timeout check or the primary is marked down and the stack silently
@@ -129,7 +129,7 @@ case_scripts() {
     has "check.sh verifies tls-inbound socks"    "$(cat "$HERE/check.sh" 2>/dev/null || true)" 'vpndogs-tls-inbound:1065'
     has "check.sh verifies tls-inbound fallback" "$(cat "$HERE/check.sh" 2>/dev/null || true)" '127.0.0.1:8080'
     has "check.sh waits for tls-inbound health"  "$(cat "$HERE/check.sh" 2>/dev/null || true)" 'tls_budget='
-    # the sb-client healthcheck is a real end-to-end tunnel fetch and the LB
+    # the xray-client healthcheck is a real end-to-end tunnel fetch and the LB
     # only starts once that client is healthy: the readiness budget has to
     # cover it
     has "check.sh budget covers the tunnel healthcheck" \

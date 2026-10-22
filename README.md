@@ -37,7 +37,7 @@ All variables are optional and default to the standard `vpndogs` container names
 |---|---|---|
 | `SELECTOR_CONFIG_DIR` | `/etc/haproxy-selector` | Directory where `haproxy.cfg` is written at boot |
 | `SELECTOR_PORT` | `1080` | Frontend TCP port `vpndogs-selector` binds |
-| `LB_HOST` | `vpndogs-sb-clients-lb` | Primary backend hostname in `haproxy.cfg` |
+| `LB_HOST` | `vpndogs-xray-clients-lb` | Primary backend hostname in `haproxy.cfg` |
 | `LB_PORT` | `1081` | Primary backend port in `haproxy.cfg` |
 | `SOFTETHER_HOST` | `vpndogs-softether` | Backup backend hostname in `haproxy.cfg` |
 | `SOFTETHER_PORT` | `1082` | Backup backend port in `haproxy.cfg` |

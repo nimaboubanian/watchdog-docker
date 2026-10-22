@@ -16,14 +16,14 @@ ROUTER="${ROUTER_HOST:-vpndogs-router}"
 ROUTER_PORT="${ROUTER_PORT:-1070}"
 SELECTOR=vpndogs-selector
 SELECTOR_CONFIG_DIR="${SELECTOR_CONFIG_DIR:-/etc/haproxy-selector}"
-LB=vpndogs-sb-clients-lb
+LB=vpndogs-xray-clients-lb
 SE=vpndogs-softether
 IPSEC=vpndogs-ipsec-inbound
 WG=vpndogs-wg-inbound
 AWG=vpndogs-awg-inbound
 OVPN=vpndogs-ovpn-inbound
 TLS=vpndogs-tls-inbound
-CONTAINERS=("$WATCHDOG" "$ROUTER" "$SELECTOR" "$LB" vpndogs-sb-client-1 vpndogs-sb-client-2 vpndogs-sb-client-3 vpndogs-sb-client-4 "$SE" "$IPSEC" "$WG" "$AWG" "$OVPN" "$TLS")
+CONTAINERS=("$WATCHDOG" "$ROUTER" "$SELECTOR" "$LB" vpndogs-xray-client-1 vpndogs-xray-client-2 vpndogs-xray-client-3 vpndogs-xray-client-4 "$SE" "$IPSEC" "$WG" "$AWG" "$OVPN" "$TLS")
 
 UL_BODY=$(mktemp)
 
@@ -112,10 +112,10 @@ s "local socks/http :$ROUTER_PORT ──► router [$r]"
 [ "$r" = UP ] && [ "$sel" = UP ] && {
     s "                                             └─► $LB [$lbm] roundrobin :1081"
     for n in 1 2 3 4; do
-        if snu "vpndogs-sb-client-$n"; then
-            s "                                                  ├─ sb$n ●"
+        if snu "vpndogs-xray-client-$n"; then
+            s "                                                  ├─ xray$n ●"
         else
-            s "                                                  ├─ sb$n ○ down"
+            s "                                                  ├─ xray$n ○ down"
         fi
     done
     s "                                                  └─ (per-node egress below)"
@@ -213,10 +213,10 @@ s "|---|---|---|---|---|"
 quality_probe "direct (host)" --noproxy '*' || true
 [ "$(up_mark "$ROUTER")" = UP ] && quality_probe "cluster (via :$ROUTER_PORT)" --socks5-hostname "$ROUTER:$ROUTER_PORT" || true
 for n in 1 2 3 4; do
-    cc=vpndogs-sb-client-$n
+    cc=vpndogs-xray-client-$n
     snu "$cc" || continue
     ipp=$(cip "$cc")
-    quality_probe "sb$n ($cc)" --socks5-hostname "$ipp:1081" || true
+    quality_probe "xray$n ($cc)" --socks5-hostname "$ipp:1081" || true
 done
 [ "$(up_mark "$SE")" = UP ] && quality_probe "softether (gost :1082)" --proxy "http://$(cip "$SE"):1082" || true
 s ""
@@ -227,7 +227,7 @@ step_end
 step_start "load balancer policies"
 s "## Load balancer policies"
 s ""
-s "**selector** — primary sb-cluster, backup softether (socks-handshake tcp-check):"
+s "**selector** — primary xray-cluster, backup softether (socks-handshake tcp-check):"
 s '```'
 if [ -s "$SELECTOR_CONFIG_DIR/haproxy.cfg" ]; then
     s "$(sed -n '/^backend egress/,$p' "$SELECTOR_CONFIG_DIR/haproxy.cfg" 2>/dev/null | grep -v 'checksum\|^resolvers\|^    nameserver\|^    hold ' || true)"
@@ -254,8 +254,8 @@ if ! snu "$LB"; then s "(not running)"; fi
 s '```'
 if snu "$LB"; then
     for n in 1 2 3 4; do
-        if docker exec "$LB" nc -z "sb$n" 1081 >/dev/null 2>&1; then s "- server sb$n: **UP**"
-        else s "- server sb$n: **DOWN**"; fi
+        if docker exec "$LB" nc -z "xray$n" 1081 >/dev/null 2>&1; then s "- server xray$n: **UP**"
+        else s "- server xray$n: **DOWN**"; fi
     done
 fi
 s ""
