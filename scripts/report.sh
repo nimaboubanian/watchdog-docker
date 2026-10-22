@@ -249,7 +249,7 @@ s ""
 s "**$LB** — roundrobin:"
 s '```'
 s "$(docker exec "$LB" cat /usr/local/etc/haproxy/haproxy.cfg 2>/dev/null \
-    | sed -n '/^backend singbox/,$p' | grep -v 'checksum' || true)"
+    | sed -n '/^backend /,$p' | grep -v 'checksum' || true)"
 if ! snu "$LB"; then s "(not running)"; fi
 s '```'
 if snu "$LB"; then
